@@ -1,0 +1,6 @@
+.godot/
+build/
+# the repository root .gitignore ignores *.json and *.txt globally;
+# re-include them here — level configs and localization are JSON
+!**/*.json
+!**/*.txt
