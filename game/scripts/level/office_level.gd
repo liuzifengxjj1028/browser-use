@@ -35,7 +35,7 @@ var _open_walls: Dictionary = {}   # Vector2i -> Node ('o' walls)
 var _lights: Array = []
 var _flicker_level := 0
 var _flicker_timer := 0.0
-var _ambient_target := 1.0
+var _ambient_target := 1.35
 var _env: Environment
 var _printer: Node3D = null
 var _printer_hum: AudioStreamPlayer3D = null
@@ -61,7 +61,6 @@ func _ready() -> void:
 	_build_astar()
 	_spawn_actors()
 	_emit_objective("OBJ_FIND_ITEM")
-
 func _load_config() -> void:
 	var f := FileAccess.open("res://data/levels/office.json", FileAccess.READ)
 	config = JSON.parse_string(f.get_as_text())
@@ -156,6 +155,8 @@ func _make_materials() -> void:
 	_mat("cooler", Color(0.82, 0.84, 0.86), 0.4)
 	_mat("exit_sign", Color(0.10, 0.5, 0.25), 0.5, Color(0.25, 1.0, 0.5), 2.2)
 	_mat("pedestal", Color(0.30, 0.31, 0.35), 0.75)
+	_mat("clock_face", Color(0.88, 0.88, 0.86), 0.4)
+	_mat("cardboard", Color(0.52, 0.40, 0.26), 0.95)
 	var win_m := StandardMaterial3D.new()
 	win_m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	win_m.albedo_color = Color(1, 1, 1)
@@ -171,7 +172,7 @@ func _build_environment() -> void:
 	_env.ambient_light_energy = 1.35
 	_env.tonemap_mode = Environment.TONE_MAPPER_FILMIC
 	_env.tonemap_exposure = 1.15
-	_env.glow_enabled = true
+	_env.glow_enabled = false
 	_env.glow_intensity = 0.5
 	_env.glow_bloom = 0.05
 	_env.glow_hdr_threshold = 1.1
@@ -299,6 +300,9 @@ func _parse_and_build() -> void:
 	for pc in [Vector2i(10, 1), Vector2i(2, 8), Vector2i(43, 7), Vector2i(41, 17), Vector2i(21, 25), Vector2i(3, 16), Vector2i(43, 12)]:
 		if at(pc) == ".":
 			_build_plant(pc)
+	_build_clocks()
+	_build_whiteboard()
+	_build_boxes()
 
 func side_axis_for(c: Vector2i) -> Vector3:
 	var f := _front_dir(c)
@@ -388,6 +392,9 @@ func _build_desk(c: Vector2i, ch: String, monitor_ids: Array, mon_i: int) -> voi
 		screen.mesh = sm
 		var smat := StandardMaterial3D.new()
 		smat.albedo_color = Color(0.05, 0.06, 0.08)
+		if _screen_tex == null:
+			_screen_tex = TexFactory.screen_code()
+		smat.emission_texture = _screen_tex
 		screen.set_surface_override_material(0, smat)
 		screen.position = Vector3(0, 0, 0.06)
 		ws.add_child(screen)
@@ -555,7 +562,8 @@ func _build_lights() -> void:
 				var l := OmniLight3D.new()
 				l.omni_range = 10.0
 				l.light_energy = 1.35
-				l.light_color = Color(0.87, 0.90, 0.98)
+				var warm_zone := (x > 32 and y >= 11 and y <= 16) or (x > 38 and y < 7) or (x < 15 and y > 17)
+				l.light_color = Color(1.0, 0.86, 0.66) if warm_zone else Color(0.87, 0.90, 0.98)
 				add_child(l)
 				var wp := cell_to_world(Vector2i(x, y))
 				l.position = wp + Vector3(0, 2.7, 0)
@@ -630,7 +638,10 @@ func _add_window(c: Vector2i, inward: Vector3) -> void:
 	var glass := _box(Vector3(1.55, 1.35, 0.05), wp + inward * 0.03, _mats["window"], self, false)
 	glass.rotation.y = frame.rotation.y
 
+
 var _blob_tex: GradientTexture2D = null
+var _screen_tex: ImageTexture = null
+
 
 func _contact_shadow(pos: Vector3, size: Vector2, alpha := 0.32) -> void:
 	if _blob_tex == null:
@@ -758,6 +769,92 @@ func _dress_elevator() -> void:
 	lbl.rotation.y = -PI / 2.0
 	var panel := _box(Vector3(0.06, 0.5, 0.24), Vector3(mid.x + CELL * 0.45, 1.3, mid.z), _mat("elev", Color()), self, false)
 	_box(Vector3(0.04, 0.06, 0.06), Vector3(mid.x + CELL * 0.49, 1.4, mid.z), _mat("exit_sign", Color()), self, false)
+
+
+func _build_clocks() -> void:
+	# every clock in the dream is stopped at 10:17
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 1017
+	var placed := 0
+	for y in range(1, H - 1):
+		for x in range(1, W - 1):
+			if placed >= 3 or grid[y][x] != "." or rng.randf() > 0.012:
+				continue
+			for d in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+				if at(Vector2i(x, y) + d) == "#":
+					var inward := Vector3(-d.x, 0, -d.y)
+					var clock := Node3D.new()
+					add_child(clock)
+					clock.position = cell_to_world(Vector2i(x, y)) - inward * (CELL * 0.5 - 0.06) + Vector3(0, 2.2, 0)
+					clock.rotation.y = atan2(inward.x, inward.z)
+					var rim := MeshInstance3D.new()
+					var rm := CylinderMesh.new()
+					rm.top_radius = 0.24
+					rm.bottom_radius = 0.24
+					rm.height = 0.04
+					rim.mesh = rm
+					rim.material_override = _mat("frame", Color())
+					rim.rotation_degrees.x = 90
+					clock.add_child(rim)
+					var face := MeshInstance3D.new()
+					var fm := CylinderMesh.new()
+					fm.top_radius = 0.21
+					fm.bottom_radius = 0.21
+					fm.height = 0.05
+					face.mesh = fm
+					face.material_override = _mat("clock_face", Color())
+					face.rotation_degrees.x = 90
+					clock.add_child(face)
+					for hand_cfg in [[0.10, deg_to_rad(-308.5)], [0.16, deg_to_rad(-102.0)]]:
+						var pivot := Node3D.new()
+						clock.add_child(pivot)
+						pivot.position = Vector3(0, 0, 0.045)
+						pivot.rotation.z = hand_cfg[1]
+						var hand := MeshInstance3D.new()
+						var hm := BoxMesh.new()
+						hm.size = Vector3(0.02, hand_cfg[0], 0.015)
+						hand.mesh = hm
+						hand.material_override = _mat("frame", Color())
+						pivot.add_child(hand)
+						hand.position = Vector3(0, hand_cfg[0] / 2.0, 0)
+					placed += 1
+					break
+
+func _build_whiteboard() -> void:
+	var c := Vector2i(42, 1)
+	if at(c) != ".":
+		return
+	var board := _box(Vector3(1.9, 1.1, 0.05), cell_to_world(c) + Vector3(0, 1.65, -(CELL * 0.5 - 0.06)), _mat("frame", Color()), self, false)
+	var face := MeshInstance3D.new()
+	var qm := QuadMesh.new()
+	qm.size = Vector2(1.8, 1.0)
+	face.mesh = qm
+	var wmat := StandardMaterial3D.new()
+	wmat.albedo_texture = TexFactory.whiteboard()
+	wmat.roughness = 0.35
+	face.material_override = wmat
+	board.add_child(face)
+	face.position = Vector3(0, 0, 0.03)
+
+func _build_boxes() -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 404
+	var placed := 0
+	for y in range(1, H - 1):
+		for x in range(1, W - 1):
+			if placed >= 6 or grid[y][x] != "." or rng.randf() > 0.008:
+				continue
+			var near_wall := false
+			for d in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+				if at(Vector2i(x, y) + d) == "#":
+					near_wall = true
+			if not near_wall:
+				continue
+			var wp := cell_to_world(Vector2i(x, y))
+			_box(Vector3(0.55, 0.4, 0.55), wp + Vector3(0.2, 0.2, 0.2), _mat("cardboard", Color()), self, false)
+			var b2 := _box(Vector3(0.48, 0.36, 0.48), wp + Vector3(0.15, 0.58, 0.25), _mat("cardboard", Color()), self, false)
+			b2.rotation.y = rng.randf_range(-0.5, 0.5)
+			placed += 1
 
 # ---------- pathfinding grid ----------
 

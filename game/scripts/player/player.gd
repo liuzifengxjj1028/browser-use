@@ -41,6 +41,8 @@ var rig: CharacterRig
 var crouch_shape: CollisionShape3D
 var hand: Node3D
 var _mesh_yaw := 0.0
+var _bob_t := 0.0
+var _cam_base_y := 1.5
 
 func _ready() -> void:
 	collision_layer = 2
@@ -107,7 +109,7 @@ func _apply_crouch() -> void:
 	cap.height = 1.1 if crouching else 1.7
 	crouch_shape.position.y = 0.55 if crouching else 0.85
 	rig.crouching = crouching
-	yaw_node.position.y = 1.05 if crouching else 1.5
+	_cam_base_y = 1.05 if crouching else 1.5
 
 func _physics_process(delta: float) -> void:
 	yaw_node.rotation.y = yaw
@@ -144,6 +146,10 @@ func _physics_process(delta: float) -> void:
 	# rotate the visible body toward movement
 	var hvel := Vector3(velocity.x, 0, velocity.z)
 	rig.move_speed = hvel.length()
+	if is_on_floor() and hvel.length() > 0.5:
+		_bob_t += delta * (7.0 + hvel.length() * 1.4)
+	yaw_node.position.y = lerpf(yaw_node.position.y,
+		_cam_base_y + sin(_bob_t) * 0.022 * clampf(hvel.length() / 3.0, 0.0, 1.2), 10.0 * delta)
 	if hvel.length() > 0.4:
 		_mesh_yaw = lerp_angle(_mesh_yaw, atan2(hvel.x, hvel.z) + PI, 10.0 * delta)
 		rig.rotation.y = _mesh_yaw

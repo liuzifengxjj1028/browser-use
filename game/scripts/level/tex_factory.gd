@@ -38,7 +38,8 @@ static func carpet() -> Dictionary:
 	for y in s:
 		for x in s:
 			var v := clampf(n.get_noise_2d(x, y) * 0.5 + 0.5, 0.0, 1.0)
-			img.set_pixel(x, y, a.lerp(b, v))
+			var checker := 1.0 if ((x * 2 / s) + (y * 2 / s)) % 2 == 0 else 0.88
+			img.set_pixel(x, y, a.lerp(b, v) * checker)
 			var h := 0.5 + (v - 0.5) * 0.5
 			hgt.set_pixel(x, y, Color(h, h, h))
 	for i in 420:
@@ -74,6 +75,13 @@ static func wall(wall_h: float) -> Dictionary:
 			var h := 0.5 + (v - 0.5) * 0.25
 			hgt.set_pixel(x, y, Color(h, h, h))
 	var base_px := int(0.16 / wall_h * s)
+	var dado_px := int(1.0 / wall_h * s)
+	for y2 in range(base_px, dado_px):
+		for x2 in s:
+			var c2 := img.get_pixel(x2, y2)
+			img.set_pixel(x2, y2, Color(c2.r * 0.82, c2.g * 0.80, c2.b * 0.76))
+	img.fill_rect(Rect2i(0, dado_px, s, 2), Color(0.20, 0.19, 0.18))
+	hgt.fill_rect(Rect2i(0, dado_px, s, 2), Color(0.62, 0.62, 0.62))
 	img.fill_rect(Rect2i(0, 0, s, base_px), Color(0.09, 0.09, 0.10))
 	img.fill_rect(Rect2i(0, base_px, s, 1), Color(0.15, 0.15, 0.16))
 	hgt.fill_rect(Rect2i(0, 0, s, base_px), Color(0.65, 0.65, 0.65))
@@ -185,4 +193,43 @@ static func poster(seed_v: int) -> ImageTexture:
 			pal[rng.randi_range(1, 2)] * rng.randf_range(0.7, 1.1))
 	img.fill_rect(Rect2i(0, 54, 48, 2), pal[1] * 0.6)
 	img.fill_rect(Rect2i(4, 58, 24, 2), pal[1] * 0.8)
+	return _tex(img)
+
+## Monitor "code" screen texture (emission).
+static func screen_code() -> ImageTexture:
+	var img := _new_rgb(Vector2i(96, 64))
+	img.fill(Color(0.02, 0.03, 0.05))
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 1017
+	var y := 4
+	while y < 60:
+		var x := rng.randi_range(4, 20)
+		for i in rng.randi_range(1, 4):
+			var w := rng.randi_range(6, 22)
+			if x + w > 90:
+				break
+			var c := Color(0.55, 0.75, 0.85)
+			if rng.randf() < 0.18:
+				c = Color(0.9, 0.7, 0.35)
+			img.fill_rect(Rect2i(x, y, w, 2), c)
+			x += w + rng.randi_range(4, 10)
+		y += rng.randi_range(4, 7)
+	return _tex(img)
+
+## Whiteboard with marker scribbles and one circled date.
+static func whiteboard() -> ImageTexture:
+	var img := _new_rgb(Vector2i(96, 64))
+	img.fill(Color(0.85, 0.86, 0.87))
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 88
+	for i in 7:
+		var y := rng.randi_range(6, 56)
+		var x := rng.randi_range(6, 30)
+		var w := rng.randi_range(16, 55)
+		var c: Color = [Color(0.25, 0.35, 0.6), Color(0.7, 0.3, 0.3), Color(0.2, 0.2, 0.25)][rng.randi_range(0, 2)]
+		img.fill_rect(Rect2i(x, y, mini(w, 90 - x), 2), c)
+	img.fill_rect(Rect2i(60, 20, 22, 2), Color(0.7, 0.3, 0.3))
+	img.fill_rect(Rect2i(60, 30, 22, 2), Color(0.7, 0.3, 0.3))
+	img.fill_rect(Rect2i(60, 20, 2, 12), Color(0.7, 0.3, 0.3))
+	img.fill_rect(Rect2i(80, 20, 2, 12), Color(0.7, 0.3, 0.3))
 	return _tex(img)

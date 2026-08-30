@@ -155,7 +155,7 @@ func show_subtitle(key: String, duration: float) -> void:
 	_subtitle_tween.tween_property(subtitle_label, "modulate:a", 0.0, 0.6)
 
 func _process(delta: float) -> void:
-	var target := 0.55 if _tense else 0.0
+	var target := 0.55 if _tense else 0.10
 	var cur: Variant = _vignette_mat.get_shader_parameter("intensity")
 	var curf := float(cur) if cur != null else 0.0
 	_vignette_mat.set_shader_parameter("intensity", lerpf(curf, target, delta * 3.0))

@@ -476,3 +476,7 @@ func _update_flashlight() -> void:
 			c = Color(0.9, 0.5, 0.9)
 	flashlight.light_color = flashlight.light_color.lerp(c, 0.15)
 	flashlight.rotation_degrees.x = -6.0
+	if tense:
+		flashlight.light_energy = 2.4 + sin(Time.get_ticks_msec() * 0.03) * 0.35 + randf_range(-0.15, 0.15)
+	else:
+		flashlight.light_energy = lerpf(flashlight.light_energy, 2.4, 0.1)
