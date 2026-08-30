@@ -27,16 +27,27 @@ echo "==> Using site config: $CONF"
 mkdir -p /etc/nginx/snippets
 cat > /etc/nginx/snippets/back-of-dreams.conf <<'SNIP'
 location = /dream { return 301 /dream/; }
-location /dream/ {
+# ^~ stops regex locations (panel static-asset rules) from hijacking
+# the index internal redirect; the types block fixes wasm MIME on
+# older nginx and must list every extension the export uses.
+location ^~ /dream/ {
     alias /var/www/back-of-dreams/;
     index index.html;
+    types {
+        text/html html;
+        application/javascript js;
+        application/wasm wasm;
+        image/png png;
+        application/octet-stream pck;
+    }
 }
 SNIP
 
 if ! grep -q "back-of-dreams.conf" "$CONF"; then
-  cp "$CONF" "${CONF}.bak.back-of-dreams"
+  mkdir -p /root/nginx-backups
+  cp "$CONF" "/root/nginx-backups/$(basename "$CONF").bak"
   sed -i '0,/listen[^;]*443[^;]*;/s//&\n    include snippets\/back-of-dreams.conf;/' "$CONF"
-  echo "==> Included snippet in $CONF (backup: ${CONF}.bak.back-of-dreams)"
+  echo "==> Included snippet in $CONF (backup in /root/nginx-backups/)"
 else
   echo "==> Snippet already included"
 fi
