@@ -2,6 +2,14 @@
 # One-shot deploy of "The Back of Dreams" web prototype onto an Ubuntu/Debian
 # server with nginx, serving on port 8080 (pass a different port as $1).
 # Usage:  bash deploy-do.sh [port]
+#
+# IMPORTANT: Godot 4 web exports require a Secure Context, i.e. HTTPS or
+# localhost. Serving plain HTTP on a public IP will show "Secure Context -
+# Check web server configuration (use HTTPS)". Put this behind an existing
+# HTTPS site instead — add to that site's server{} block:
+#     location = /dream { return 301 /dream/; }
+#     location /dream/ { alias /var/www/back-of-dreams/; index index.html; }
+# (no try_files here: try_files + alias is a known nginx pitfall)
 set -euo pipefail
 
 BRANCH="claude/3d-game-development-yi52wn"
@@ -60,7 +68,8 @@ fi
 IP=$(curl -fsSL -4 https://ifconfig.me 2>/dev/null || hostname -I | awk '{print $1}')
 echo ""
 echo "======================================================"
-echo "  Deployed. Play at:  http://${IP}:${PORT}/"
+echo "  Files served at:  http://${IP}:${PORT}/"
 echo "======================================================"
-echo "If the page doesn't load, also allow port ${PORT} in the"
-echo "DigitalOcean cloud firewall (Networking -> Firewalls)."
+echo "NOTE: Godot 4 needs HTTPS (Secure Context) — expose this"
+echo "through an HTTPS site as /dream/ (see header of this script),"
+echo "or open the URL via an SSH tunnel to localhost."
