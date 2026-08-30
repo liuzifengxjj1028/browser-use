@@ -39,6 +39,8 @@ var _ambient_target := 1.0
 var _env: Environment
 var _printer: Node3D = null
 var _printer_hum: AudioStreamPlayer3D = null
+var _printer_led: StandardMaterial3D = null
+var _led_timer := 0.0
 var _elevator_doors: Array = []
 var _elevator_lamp: OmniLight3D = null
 var _cup_node: Node3D = null
@@ -100,12 +102,16 @@ func _mat(name: String, color: Color, rough := 0.9, emis := Color(0, 0, 0), emis
 
 ## Textured material: world-space triplanar mapping so greedy-merged boxes
 ## of any size tile seamlessly; albedo_color tints the mid-grey texture.
-func _mat_tex(name: String, color: Color, tex: Texture2D, uv_scale: Vector3, rough := 0.9) -> StandardMaterial3D:
+func _mat_tex(name: String, color: Color, tex: Dictionary, uv_scale: Vector3, rough := 0.9, normal_scale := 1.0) -> StandardMaterial3D:
 	if _mats.has(name):
 		return _mats[name]
 	var m := StandardMaterial3D.new()
 	m.albedo_color = color
-	m.albedo_texture = tex
+	m.albedo_texture = tex["a"]
+	if tex.get("n") != null:
+		m.normal_enabled = true
+		m.normal_texture = tex["n"]
+		m.normal_scale = normal_scale
 	m.uv1_triplanar = true
 	m.uv1_world_triplanar = true
 	m.uv1_scale = uv_scale
@@ -122,17 +128,17 @@ func _make_materials() -> void:
 	var fabric_t := TexFactory.fabric()
 	var metal_t := TexFactory.metal()
 	# 1 texture repeat per 2 m on floors/ceilings; walls pin image row 0 to y=0
-	_mat_tex("floor", Color(0.42, 0.45, 0.54), carpet_t, Vector3(0.5, 0.5, 0.5))
-	_mat_tex("ceil", Color(0.42, 0.43, 0.46), ceil_t, Vector3(0.5, 0.5, 0.5))
-	_mat_tex("wall", Color(0.62, 0.63, 0.68), wall_t, Vector3(0.45, 1.0 / WALL_H, 0.45), 0.85)
-	_mat_tex("wall_glitch", Color(0.62, 0.40, 0.66), wall_t, Vector3(0.45, 1.0 / WALL_H, 0.45), 0.85)
-	_mat_tex("partition", Color(0.58, 0.64, 0.82), fabric_t, Vector3(1.2, 1.2, 1.2), 0.95)
-	_mat_tex("desk", Color(0.70, 0.54, 0.38), wood_t, Vector3(0.55, 3.5, 0.55), 0.7)
+	_mat_tex("floor", Color(1, 1, 1), carpet_t, Vector3(0.5, 0.5, 0.5), 0.95, 1.4)
+	_mat_tex("ceil", Color(1, 1, 1), ceil_t, Vector3(0.5, 0.5, 0.5), 0.95, 1.0)
+	_mat_tex("wall", Color(1, 1, 1), wall_t, Vector3(0.45, 1.0 / WALL_H, 0.45), 0.85, 1.2)
+	_mat_tex("wall_glitch", Color(1.0, 0.62, 1.05), wall_t, Vector3(0.45, 1.0 / WALL_H, 0.45), 0.85, 1.2)
+	_mat_tex("partition", Color(1, 1, 1), fabric_t, Vector3(1.2, 1.2, 1.2), 0.95, 1.2)
+	_mat_tex("desk", Color(1, 1, 1), wood_t, Vector3(0.55, 3.5, 0.55), 0.6, 1.0)
 	_mat("monitor", Color(0.09, 0.10, 0.12), 0.6)
-	_mat_tex("cabinet", Color(0.55, 0.62, 0.55), metal_t, Vector3(1.6, 0.5, 1.6), 0.6)
-	_mat_tex("cabinet_worn", Color(0.80, 0.68, 0.48), metal_t, Vector3(1.6, 0.5, 1.6), 0.75)
-	_mat_tex("table", Color(0.52, 0.42, 0.32), wood_t, Vector3(0.55, 3.5, 0.55), 0.7)
-	_mat_tex("elev", Color(0.82, 0.86, 0.94), metal_t, Vector3(1.2, 0.35, 1.2), 0.35)
+	_mat_tex("cabinet", Color(0.95, 1.1, 0.95), metal_t, Vector3(1.6, 0.5, 1.6), 0.6)
+	_mat_tex("cabinet_worn", Color(1.45, 1.2, 0.85), metal_t, Vector3(1.6, 0.5, 1.6), 0.75)
+	_mat_tex("table", Color(0.78, 0.78, 0.78), wood_t, Vector3(0.55, 3.5, 0.55), 0.6, 1.0)
+	_mat_tex("elev", Color(1.5, 1.55, 1.65), metal_t, Vector3(1.2, 0.35, 1.2), 0.35)
 	_mat("printer", Color(0.55, 0.56, 0.58), 0.7)
 	_mat("cup", Color(0.85, 0.80, 0.72), 0.55)
 	_mat("stapler", Color(0.65, 0.25, 0.2), 0.6)
@@ -146,6 +152,10 @@ func _make_materials() -> void:
 	_mat("pot", Color(0.55, 0.34, 0.24), 0.85)
 	_mat("leaf", Color(0.15, 0.30, 0.17), 0.9)
 	_mat("frame", Color(0.14, 0.15, 0.17), 0.7)
+	_mat("vent", Color(0.30, 0.31, 0.34), 0.5)
+	_mat("cooler", Color(0.82, 0.84, 0.86), 0.4)
+	_mat("exit_sign", Color(0.10, 0.5, 0.25), 0.5, Color(0.25, 1.0, 0.5), 2.2)
+	_mat("pedestal", Color(0.30, 0.31, 0.35), 0.75)
 	var win_m := StandardMaterial3D.new()
 	win_m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	win_m.albedo_color = Color(1, 1, 1)
@@ -161,6 +171,10 @@ func _build_environment() -> void:
 	_env.ambient_light_energy = 1.35
 	_env.tonemap_mode = Environment.TONE_MAPPER_FILMIC
 	_env.tonemap_exposure = 1.15
+	_env.glow_enabled = true
+	_env.glow_intensity = 0.5
+	_env.glow_bloom = 0.05
+	_env.glow_hdr_threshold = 1.1
 	_env.fog_light_color = Color(0.35, 0.30, 0.45)
 	var we := WorldEnvironment.new()
 	we.environment = _env
@@ -244,17 +258,18 @@ func _parse_and_build() -> void:
 					cab_i += 1
 				"t":
 					_box(Vector3(1.8, 0.85, 1.8), wp + Vector3(0, 0.425, 0), _mat("table", Color()))
+					_contact_shadow(wp, Vector2(2.3, 2.3), 0.28)
 				"p":
 					_build_printer(c)
 				"K":
 					_build_cup(c)
 				"T":
 					_build_throwable(c)
-				"e":
+				"e", "E":
 					_build_elevator_door(c)
-				"E":
-					pass
-				"P", "G", "x", "y", "+", ".":
+				"+":
+					_build_doorframe(c)
+				"P", "G", "x", "y", ".":
 					pass
 				_:
 					if ch >= "1" and ch <= "9":
@@ -274,11 +289,20 @@ func _parse_and_build() -> void:
 		waypoints.append(cell_to_world(wp_cells[i]))
 
 	_build_elevator_interior()
+	_dress_elevator()
 	_build_lights()
 	_build_windows()
+	_build_vents()
+	_build_posters()
+	if at(Vector2i(34, 12)) == ".":
+		_build_cooler(Vector2i(34, 12))
 	for pc in [Vector2i(10, 1), Vector2i(2, 8), Vector2i(43, 7), Vector2i(41, 17), Vector2i(21, 25), Vector2i(3, 16), Vector2i(43, 12)]:
 		if at(pc) == ".":
 			_build_plant(pc)
+
+func side_axis_for(c: Vector2i) -> Vector3:
+	var f := _front_dir(c)
+	return Vector3(abs(f.y), 0, abs(f.x))
 
 func _front_dir(c: Vector2i) -> Vector2i:
 	for d in [Vector2i(0, 1), Vector2i(0, -1), Vector2i(1, 0), Vector2i(-1, 0)]:
@@ -308,8 +332,11 @@ func _build_desk(c: Vector2i, ch: String, monitor_ids: Array, mon_i: int) -> voi
 	add_child(blocker)
 	blocker.position = wp + Vector3(0, 1.1, 0)
 
+	_contact_shadow(wp, Vector2(2.5, 2.5), 0.28)
 	var rng := RandomNumberGenerator.new()
 	rng.seed = c.x * 131 + c.y * 7
+	if ch == "d":
+		_box(Vector3(0.5, 0.66, 1.2), wp + side_axis_for(c) * 0.6 + Vector3(0, 0.33, 0), _mat("pedestal", Color()))
 	var kb := _box(Vector3(0.36, 0.02, 0.14), wp + Vector3(0, 0.79, 0) + fv * 0.35, _mat("keyboard", Color()), self, false)
 	kb.rotation.y = rng.randf_range(-0.12, 0.12)
 	for i in rng.randi_range(0, 2):
@@ -372,6 +399,20 @@ func _build_desk(c: Vector2i, ch: String, monitor_ids: Array, mon_i: int) -> voi
 		lbl.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 		lbl.position = Vector3(0, 0.55, 0)
 		ws.add_child(lbl)
+		var stand := MeshInstance3D.new()
+		var stm := BoxMesh.new()
+		stm.size = Vector3(0.09, 0.26, 0.09)
+		stand.mesh = stm
+		stand.material_override = _mat("monitor", Color())
+		ws.add_child(stand)
+		stand.position = Vector3(0, -0.30, -0.02)
+		var foot := MeshInstance3D.new()
+		var ftm := BoxMesh.new()
+		ftm.size = Vector3(0.30, 0.02, 0.18)
+		foot.mesh = ftm
+		foot.material_override = _mat("monitor", Color())
+		ws.add_child(foot)
+		foot.position = Vector3(0, -0.42, -0.02)
 		add_child(ws)
 		ws.position = wp + Vector3(0, 1.05, 0) - fv * 0.55
 		ws.look_at(ws.global_position + fv, Vector3.UP)
@@ -390,6 +431,8 @@ func _build_cabinet(c: Vector2i, risk: float) -> void:
 		door.rotation.y = 0.5
 		door.position += fv * 0.2
 		_box(Vector3(0.9, 0.02, 0.7), cell_to_world(c + f) + Vector3(0, 0.011, 0), _mat("scuff", Color()), self, false)
+	_box(Vector3(0.05, 0.4, 0.04), wp + Vector3(0, 1.15, 0) + fv * 0.31 + Vector3(f.y, 0, f.x) * 0.35, _mat("chrome", Color()), self, false)
+	_contact_shadow(wp, Vector2(1.9, 1.7), 0.3)
 	var spot := HideSpot.new()
 	add_child(spot)
 	spot.position = wp
@@ -405,6 +448,19 @@ func _build_printer(c: Vector2i) -> void:
 	_printer_hum.max_distance = 18.0
 	_printer.add_child(_printer_hum)
 	_printer_hum.play()
+	_printer_led = StandardMaterial3D.new()
+	_printer_led.albedo_color = Color(0.1, 0.3, 0.15)
+	_printer_led.emission_enabled = true
+	_printer_led.emission = Color(0.2, 1.0, 0.4)
+	_printer_led.emission_energy_multiplier = 2.0
+	var led := MeshInstance3D.new()
+	var lm := BoxMesh.new()
+	lm.size = Vector3(0.06, 0.03, 0.03)
+	led.mesh = lm
+	led.material_override = _printer_led
+	_printer.add_child(led)
+	led.position = Vector3(0.35, 0.57, 0.5)
+	_contact_shadow(cell_to_world(world_to_cell(_printer.global_position if _printer.is_inside_tree() else _printer.position)), Vector2(1.6, 1.4), 0.3)
 
 func _build_cup(c: Vector2i) -> void:
 	var wp := cell_to_world(c)
@@ -573,6 +629,135 @@ func _add_window(c: Vector2i, inward: Vector3) -> void:
 	frame.rotation.y = atan2(inward.x, inward.z)
 	var glass := _box(Vector3(1.55, 1.35, 0.05), wp + inward * 0.03, _mats["window"], self, false)
 	glass.rotation.y = frame.rotation.y
+
+var _blob_tex: GradientTexture2D = null
+
+func _contact_shadow(pos: Vector3, size: Vector2, alpha := 0.32) -> void:
+	if _blob_tex == null:
+		_blob_tex = GradientTexture2D.new()
+		_blob_tex.fill = GradientTexture2D.FILL_RADIAL
+		_blob_tex.fill_from = Vector2(0.5, 0.5)
+		_blob_tex.fill_to = Vector2(0.5, 0.0)
+		var g := Gradient.new()
+		g.set_color(0, Color(0, 0, 0, 1))
+		g.set_color(1, Color(0, 0, 0, 0))
+		_blob_tex.gradient = g
+	var mi := MeshInstance3D.new()
+	var qm := QuadMesh.new()
+	qm.size = size
+	mi.mesh = qm
+	var m := StandardMaterial3D.new()
+	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	m.albedo_texture = _blob_tex
+	m.albedo_color = Color(1, 1, 1, alpha)
+	mi.material_override = m
+	mi.rotation_degrees.x = -90
+	add_child(mi)
+	mi.position = pos + Vector3(0, 0.02, 0)
+
+func _build_doorframe(c: Vector2i) -> void:
+	var wp := cell_to_world(c)
+	# passage axis = the axis whose neighbors are walkable
+	var along_z: bool = at(c + Vector2i(0, 1)) not in ["#", "o"] and at(c + Vector2i(0, -1)) not in ["#", "o"]
+	var side := Vector3(1, 0, 0) if along_z else Vector3(0, 0, 1)
+	var thick := Vector3(0.32, 0, 0.32) - side.abs() * 0.32 + side.abs() * 0.18
+	for sgn in [-1.0, 1.0]:
+		_box(Vector3(0.18 if not along_z else 0.44, 2.3, 0.18 if along_z else 0.44).min(Vector3(0.44,2.3,0.44)),
+			wp + side * (CELL * 0.5 - 0.08) * sgn + Vector3(0, 1.15, 0), _mat("frame", Color()))
+	var header := _box(Vector3(CELL if not along_z else 0.44, 0.7, CELL if along_z else 0.44),
+		wp + Vector3(0, 2.65, 0), _mat("frame", Color()))
+	# glowing EXIT sign hanging under the header
+	var sign := _box(Vector3(0.6, 0.24, 0.05), wp + Vector3(0, 2.18, 0), _mat("exit_sign", Color()), self, false)
+	if along_z:
+		sign.rotation.y = PI / 2.0
+	var lbl := Label3D.new()
+	lbl.text = "EXIT 出口"
+	lbl.font_size = 30
+	lbl.pixel_size = 0.004
+	lbl.modulate = Color(0.85, 1.0, 0.9)
+	lbl.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	lbl.no_depth_test = false
+	add_child(lbl)
+	lbl.position = wp + Vector3(0, 2.18, 0)
+
+func _build_vents() -> void:
+	for y in H:
+		for x in W:
+			if grid[y][x] in ["#", "o"]:
+				continue
+			if x % 9 == 7 and y % 7 == 5:
+				var wp := cell_to_world(Vector2i(x, y))
+				_box(Vector3(1.2, 0.06, 0.7), wp + Vector3(0, WALL_H - 0.06, 0), _mat("vent", Color()), self, false)
+				for i in 3:
+					_box(Vector3(1.1, 0.02, 0.06), wp + Vector3(0, WALL_H - 0.10, -0.2 + i * 0.2), _mat("frame", Color()), self, false)
+
+func _build_posters() -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 2024
+	var placed := 0
+	for y in range(1, H - 1):
+		for x in range(1, W - 1):
+			if placed >= 10 or grid[y][x] != "." or rng.randf() > 0.03:
+				continue
+			for d in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+				if at(Vector2i(x, y) + d) == "#":
+					var wp := cell_to_world(Vector2i(x, y))
+					var inward := Vector3(-d.x, 0, -d.y)
+					var pm := StandardMaterial3D.new()
+					pm.albedo_texture = TexFactory.poster(x * 100 + y)
+					pm.roughness = 0.9
+					var post := _box(Vector3(0.62, 0.85, 0.03), wp - inward * (CELL * 0.5 - 0.05) + Vector3(0, 1.62, 0), _mat("frame", Color()), self, false)
+					post.rotation.y = atan2(inward.x, inward.z)
+					var face := MeshInstance3D.new()
+					var fm := QuadMesh.new()
+					fm.size = Vector2(0.56, 0.78)
+					face.mesh = fm
+					face.material_override = pm
+					post.add_child(face)
+					face.position = Vector3(0, 0, 0.02)
+					placed += 1
+					break
+
+func _build_cooler(c: Vector2i) -> void:
+	var wp := cell_to_world(c)
+	var base := _box(Vector3(0.38, 1.05, 0.38), wp + Vector3(0, 0.525, 0), _mat("cooler", Color()))
+	var jug := MeshInstance3D.new()
+	var jm := CylinderMesh.new()
+	jm.top_radius = 0.15
+	jm.bottom_radius = 0.17
+	jm.height = 0.38
+	jug.mesh = jm
+	var jmat := StandardMaterial3D.new()
+	jmat.albedo_color = Color(0.55, 0.75, 0.95, 0.55)
+	jmat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	jmat.roughness = 0.1
+	jug.material_override = jmat
+	base.add_child(jug)
+	jug.position = Vector3(0, 0.72, 0)
+	_contact_shadow(wp, Vector2(0.9, 0.9))
+
+func _dress_elevator() -> void:
+	# floor indicator above the doors + a call panel with a glowing button
+	var cells: Array = []
+	for y in H:
+		for x in W:
+			if grid[y][x] == "E":
+				cells.append(Vector2i(x, y))
+	if cells.is_empty():
+		return
+	var mid := cell_to_world(cells[0]) .lerp(cell_to_world(cells[cells.size() - 1]), 0.5)
+	var ind := _box(Vector3(0.16, 0.3, 0.9), Vector3(mid.x + CELL * 0.42, 2.75, mid.z), _mat("frame", Color()), self, false)
+	var lbl := Label3D.new()
+	lbl.text = "▼ ∞"
+	lbl.font_size = 48
+	lbl.pixel_size = 0.003
+	lbl.modulate = Color(1.0, 0.62, 0.25)
+	add_child(lbl)
+	lbl.position = Vector3(mid.x + CELL * 0.52, 2.75, mid.z)
+	lbl.rotation.y = -PI / 2.0
+	var panel := _box(Vector3(0.06, 0.5, 0.24), Vector3(mid.x + CELL * 0.45, 1.3, mid.z), _mat("elev", Color()), self, false)
+	_box(Vector3(0.04, 0.06, 0.06), Vector3(mid.x + CELL * 0.49, 1.4, mid.z), _mat("exit_sign", Color()), self, false)
 
 # ---------- pathfinding grid ----------
 
@@ -794,6 +979,13 @@ func _process(delta: float) -> void:
 						var mi: MeshInstance3D = panel.get_child(0)
 						mi.transparency = clampf(1.1 - l.light_energy, 0.0, 0.75)
 	_env.ambient_light_energy = lerpf(_env.ambient_light_energy, _ambient_target, delta * 1.5)
+	if _printer_led != null:
+		_led_timer += delta
+		if _printer_hum != null:
+			_printer_led.emission_energy_multiplier = 2.0 if fmod(_led_timer, 1.6) < 0.8 else 0.2
+		else:
+			_printer_led.emission = Color(1.0, 0.25, 0.15)
+			_printer_led.emission_energy_multiplier = 1.8
 	# safety: player fell out of the world
 	if player != null and player.global_position.y < -6.0:
 		player.global_position = cell_to_world(_find_char("P")) + Vector3(0, 0.5, 0)
@@ -813,14 +1005,14 @@ func _apply_stage(st: Dictionary) -> void:
 	# the dream seeps into the materials themselves
 	var tint := create_tween()
 	if st_name == "anomaly":
-		tint.parallel().tween_property(_mats["wall"], "albedo_color", Color(0.58, 0.62, 0.55), 6.0)
-		tint.parallel().tween_property(_mats["floor"], "albedo_color", Color(0.38, 0.40, 0.44), 6.0)
-		tint.parallel().tween_property(_mats["partition"], "albedo_color", Color(0.55, 0.56, 0.66), 6.0)
+		tint.parallel().tween_property(_mats["wall"], "albedo_color", Color(0.88, 0.98, 0.80), 6.0)
+		tint.parallel().tween_property(_mats["floor"], "albedo_color", Color(0.86, 0.90, 0.84), 6.0)
+		tint.parallel().tween_property(_mats["partition"], "albedo_color", Color(0.88, 0.88, 0.80), 6.0)
 	elif st_name == "unravel":
-		tint.parallel().tween_property(_mats["wall"], "albedo_color", Color(0.50, 0.42, 0.60), 8.0)
-		tint.parallel().tween_property(_mats["floor"], "albedo_color", Color(0.30, 0.28, 0.40), 8.0)
-		tint.parallel().tween_property(_mats["ceil"], "albedo_color", Color(0.30, 0.30, 0.38), 8.0)
-		tint.parallel().tween_property(_mats["desk"], "albedo_color", Color(0.55, 0.40, 0.42), 8.0)
+		tint.parallel().tween_property(_mats["wall"], "albedo_color", Color(0.82, 0.62, 1.02), 8.0)
+		tint.parallel().tween_property(_mats["floor"], "albedo_color", Color(0.72, 0.62, 0.95), 8.0)
+		tint.parallel().tween_property(_mats["ceil"], "albedo_color", Color(0.72, 0.70, 0.92), 8.0)
+		tint.parallel().tween_property(_mats["desk"], "albedo_color", Color(1.05, 0.68, 0.72), 8.0)
 		if player != null and player.camera != null:
 			tint.parallel().tween_property(player.camera, "fov", 75.0, 8.0)
 	_env.fog_enabled = float(st.get("fog", 0.0)) > 0.0
