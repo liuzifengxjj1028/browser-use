@@ -107,6 +107,8 @@ func _mat_tex(name: String, color: Color, tex: Dictionary, uv_scale: Vector3, ro
 	var m := StandardMaterial3D.new()
 	m.albedo_color = color
 	m.albedo_texture = tex["a"]
+	if tex.get("r") != null:
+		m.roughness_texture = tex["r"]
 	if tex.get("n") != null:
 		m.normal_enabled = true
 		m.normal_texture = tex["n"]
@@ -132,11 +134,12 @@ func _make_materials() -> void:
 	_mat_tex("wall", Color(1, 1, 1), wall_t, Vector3(0.45, 1.0 / WALL_H, 0.45), 0.85, 1.2)
 	_mat_tex("wall_glitch", Color(1.0, 0.62, 1.05), wall_t, Vector3(0.45, 1.0 / WALL_H, 0.45), 0.85, 1.2)
 	_mat_tex("partition", Color(1, 1, 1), fabric_t, Vector3(1.2, 1.2, 1.2), 0.95, 1.2)
-	_mat_tex("desk", Color(1, 1, 1), wood_t, Vector3(0.55, 3.5, 0.55), 0.6, 1.0)
+	var photo_wood := TexFactory.photo_wood()
+	_mat_tex("desk", Color(0.82, 0.72, 0.62), photo_wood, Vector3(0.35, 0.7, 0.35), 0.75, 1.2)
 	_mat("monitor", Color(0.09, 0.10, 0.12), 0.6)
 	_mat_tex("cabinet", Color(0.95, 1.1, 0.95), metal_t, Vector3(1.6, 0.5, 1.6), 0.6)
 	_mat_tex("cabinet_worn", Color(1.45, 1.2, 0.85), metal_t, Vector3(1.6, 0.5, 1.6), 0.75)
-	_mat_tex("table", Color(0.78, 0.78, 0.78), wood_t, Vector3(0.55, 3.5, 0.55), 0.6, 1.0)
+	_mat_tex("table", Color(0.62, 0.55, 0.50), photo_wood, Vector3(0.35, 0.7, 0.35), 0.75, 1.2)
 	_mat_tex("elev", Color(1.5, 1.55, 1.65), metal_t, Vector3(1.2, 0.35, 1.2), 0.35)
 	_mat("printer", Color(0.55, 0.56, 0.58), 0.7)
 	_mat("cup", Color(0.85, 0.80, 0.72), 0.55)

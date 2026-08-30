@@ -233,3 +233,20 @@ static func whiteboard() -> ImageTexture:
 	img.fill_rect(Rect2i(60, 20, 2, 12), Color(0.7, 0.3, 0.3))
 	img.fill_rect(Rect2i(80, 20, 2, 12), Color(0.7, 0.3, 0.3))
 	return _tex(img)
+
+## Photo-based wood: three.js example hardwood (MIT). Normal map is
+## generated from the bump photo at load time.
+static func photo_wood() -> Dictionary:
+	var albedo: Texture2D = load("res://assets/textures/hardwood2_diffuse.jpg")
+	var rough: Texture2D = load("res://assets/textures/hardwood2_roughness.jpg")
+	var bump: Texture2D = load("res://assets/textures/hardwood2_bump.jpg")
+	var normal: ImageTexture = null
+	if bump != null:
+		var bi := bump.get_image()
+		if bi != null:
+			if bi.is_compressed():
+				bi.decompress()
+			bi.bump_map_to_normal_map(3.0)
+			bi.generate_mipmaps()
+			normal = ImageTexture.create_from_image(bi)
+	return {"a": albedo, "n": normal, "r": rough}
