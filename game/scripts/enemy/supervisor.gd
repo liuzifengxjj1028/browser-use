@@ -52,7 +52,7 @@ var _noise_strikes := 0.0
 var _pending_detect := 0.0
 
 var flashlight: SpotLight3D
-var body_mesh: MeshInstance3D
+var rig: CharacterRig
 
 func _ready() -> void:
 	collision_layer = 4
@@ -65,35 +65,32 @@ func _ready() -> void:
 	cs.position = Vector3(0, 1.05, 0)
 	add_child(cs)
 
-	body_mesh = MeshInstance3D.new()
-	var bm := CapsuleMesh.new()
-	bm.radius = 0.38
-	bm.height = 2.05
-	body_mesh.mesh = bm
-	var mat := StandardMaterial3D.new()
-	mat.albedo_color = Color(0.09, 0.09, 0.12)
-	body_mesh.material_override = mat
-	body_mesh.position = Vector3(0, 1.03, 0)
-	add_child(body_mesh)
-	var head := MeshInstance3D.new()
-	var hm := SphereMesh.new()
-	hm.radius = 0.24
-	hm.height = 0.48
-	head.mesh = hm
-	var hmat := StandardMaterial3D.new()
-	hmat.albedo_color = Color(0.05, 0.05, 0.06)
-	head.material_override = hmat
-	head.position = Vector3(0, 2.2, 0)
-	add_child(head)
-	var tie := MeshInstance3D.new()
-	var tm := BoxMesh.new()
-	tm.size = Vector3(0.1, 0.7, 0.03)
-	tie.mesh = tm
-	var tmat := StandardMaterial3D.new()
-	tmat.albedo_color = Color(0.45, 0.1, 0.12)
-	tie.material_override = tmat
-	tie.position = Vector3(0, 1.55, -0.38)
-	add_child(tie)
+	rig = CharacterRig.new()
+	add_child(rig)
+	rig.build({
+		"height": 2.05,
+		"shirt": Color(0.10, 0.10, 0.13),
+		"pants": Color(0.09, 0.09, 0.11),
+		"shoes": Color(0.05, 0.05, 0.06),
+		"skin": Color(0.06, 0.06, 0.07),   # faceless: the head is a matte void
+		"sheen": 0.25,
+		"tie": Color(0.48, 0.10, 0.12),
+		"hat": true,
+	})
+	# hand-held flashlight body (the SpotLight itself stays at chest height)
+	var torch := MeshInstance3D.new()
+	var tcm := CylinderMesh.new()
+	tcm.top_radius = 0.045
+	tcm.bottom_radius = 0.055
+	tcm.height = 0.24
+	torch.mesh = tcm
+	var torch_mat := StandardMaterial3D.new()
+	torch_mat.albedo_color = Color(0.25, 0.26, 0.28)
+	torch_mat.roughness = 0.4
+	torch.material_override = torch_mat
+	torch.rotation_degrees.x = 90
+	rig.add_child(torch)
+	torch.position = Vector3(-0.30, 1.05, -0.25)
 
 	flashlight = SpotLight3D.new()
 	flashlight.spot_range = 15.0
@@ -422,6 +419,7 @@ func _catch_player(from_spot: bool) -> void:
 # ---------- movement ----------
 
 func _move_along_path(delta: float) -> void:
+	rig.move_speed = Vector3(velocity.x, 0, velocity.z).length()
 	if state == S.SUSPECT or state == S.DETECT:
 		return
 	if _path.is_empty() or _path_i >= _path.size():

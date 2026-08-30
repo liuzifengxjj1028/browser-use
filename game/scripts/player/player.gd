@@ -37,7 +37,7 @@ var yaw_node: Node3D
 var pitch_node: Node3D
 var spring: SpringArm3D
 var camera: Camera3D
-var body_mesh: MeshInstance3D
+var rig: CharacterRig
 var crouch_shape: CollisionShape3D
 var hand: Node3D
 var _mesh_yaw := 0.0
@@ -53,26 +53,14 @@ func _ready() -> void:
 	crouch_shape.position = Vector3(0, 0.85, 0)
 	add_child(crouch_shape)
 
-	body_mesh = MeshInstance3D.new()
-	var bm := CapsuleMesh.new()
-	bm.radius = 0.32
-	bm.height = 1.66
-	body_mesh.mesh = bm
-	var mat := StandardMaterial3D.new()
-	mat.albedo_color = Color(0.56, 0.62, 0.72)
-	body_mesh.material_override = mat
-	body_mesh.position = Vector3(0, 0.85, 0)
-	add_child(body_mesh)
-	# direction hint: a small darker "visor" box on the facing side
-	var visor := MeshInstance3D.new()
-	var vb := BoxMesh.new()
-	vb.size = Vector3(0.26, 0.09, 0.1)
-	visor.mesh = vb
-	var vmat := StandardMaterial3D.new()
-	vmat.albedo_color = Color(0.16, 0.18, 0.24)
-	visor.material_override = vmat
-	visor.position = Vector3(0, 0.62, -0.30)
-	body_mesh.add_child(visor)
+	rig = CharacterRig.new()
+	add_child(rig)
+	rig.build({
+		"height": 1.7,
+		"shirt": Color(0.42, 0.48, 0.60),
+		"pants": Color(0.25, 0.27, 0.32),
+		"hair": Color(0.18, 0.13, 0.10),
+	})
 
 	yaw_node = Node3D.new()
 	add_child(yaw_node)
@@ -118,9 +106,7 @@ func _apply_crouch() -> void:
 	var cap: CapsuleShape3D = crouch_shape.shape
 	cap.height = 1.1 if crouching else 1.7
 	crouch_shape.position.y = 0.55 if crouching else 0.85
-	var bm: CapsuleMesh = body_mesh.mesh
-	bm.height = 1.06 if crouching else 1.66
-	body_mesh.position.y = 0.55 if crouching else 0.85
+	rig.crouching = crouching
 	yaw_node.position.y = 1.05 if crouching else 1.5
 
 func _physics_process(delta: float) -> void:
@@ -157,9 +143,10 @@ func _physics_process(delta: float) -> void:
 
 	# rotate the visible body toward movement
 	var hvel := Vector3(velocity.x, 0, velocity.z)
+	rig.move_speed = hvel.length()
 	if hvel.length() > 0.4:
 		_mesh_yaw = lerp_angle(_mesh_yaw, atan2(hvel.x, hvel.z) + PI, 10.0 * delta)
-		body_mesh.rotation.y = _mesh_yaw
+		rig.rotation.y = _mesh_yaw
 
 	# footstep noise (gameplay event + faint sound)
 	if hvel.length() > 0.5 and is_on_floor():
@@ -211,7 +198,8 @@ func enter_hide(spot: HideSpot) -> void:
 	velocity = Vector3.ZERO
 	crouch_shape.disabled = true
 	global_position = spot.hide_position
-	body_mesh.visible = false
+	rig.move_speed = 0.0
+	rig.visible = false
 	AudioSynth.play_at("door", global_position, level, -8.0)
 	hidden_changed.emit(true)
 
@@ -223,7 +211,7 @@ func exit_hide() -> void:
 	spot.occupant = null
 	global_position = spot.entry_position
 	crouch_shape.disabled = false
-	body_mesh.visible = true
+	rig.visible = true
 	AudioSynth.play_at("door", global_position, level, -8.0)
 	Game.emit_noise(global_position, 3.0, 0.3)
 	hidden_changed.emit(false)

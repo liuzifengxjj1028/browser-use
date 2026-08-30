@@ -77,3 +77,20 @@ static func metal() -> ImageTexture:
 	var img := _noise_img(53, 0.15, 3, Vector2i(32, 256), FastNoiseLite.TYPE_VALUE)
 	_soften(img, 0.12)
 	return _tex(img)
+
+## Night-city window: dark blue gradient with scattered distant lights.
+static func night_window() -> ImageTexture:
+	var img := Image.create(64, 64, false, Image.FORMAT_RGB8)
+	for y in 64:
+		var t := float(y) / 63.0
+		var c := Color(0.02, 0.04, 0.09).lerp(Color(0.07, 0.10, 0.18), t)
+		for x in 64:
+			img.set_pixel(x, y, c)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 99
+	for i in 46:
+		var x := rng.randi_range(1, 62)
+		var y := rng.randi_range(30, 62)
+		var warm := rng.randf() < 0.6
+		img.set_pixel(x, y, Color(0.95, 0.78, 0.42) if warm else Color(0.55, 0.72, 0.95))
+	return _tex(img)

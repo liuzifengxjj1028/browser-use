@@ -138,6 +138,19 @@ func _make_materials() -> void:
 	_mat("stapler", Color(0.65, 0.25, 0.2), 0.6)
 	_mat("scuff", Color(0.08, 0.07, 0.06))
 	_mat("light_panel", Color(0.9, 0.92, 0.95), 0.9, Color(0.95, 0.96, 1.0), 2.6)
+	_mat("chair", Color(0.16, 0.17, 0.19), 0.85)
+	_mat("chrome", Color(0.5, 0.52, 0.56), 0.35)
+	_mat("keyboard", Color(0.13, 0.14, 0.16), 0.8)
+	_mat("paper", Color(0.88, 0.87, 0.82), 0.95)
+	_mat("mug", Color(0.75, 0.45, 0.35), 0.6)
+	_mat("pot", Color(0.55, 0.34, 0.24), 0.85)
+	_mat("leaf", Color(0.15, 0.30, 0.17), 0.9)
+	_mat("frame", Color(0.14, 0.15, 0.17), 0.7)
+	var win_m := StandardMaterial3D.new()
+	win_m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	win_m.albedo_color = Color(1, 1, 1)
+	win_m.albedo_texture = TexFactory.night_window()
+	_mats["window"] = win_m
 
 func _build_environment() -> void:
 	_env = Environment.new()
@@ -262,6 +275,10 @@ func _parse_and_build() -> void:
 
 	_build_elevator_interior()
 	_build_lights()
+	_build_windows()
+	for pc in [Vector2i(10, 1), Vector2i(2, 8), Vector2i(43, 7), Vector2i(41, 17), Vector2i(21, 25), Vector2i(3, 16), Vector2i(43, 12)]:
+		if at(pc) == ".":
+			_build_plant(pc)
 
 func _front_dir(c: Vector2i) -> Vector2i:
 	for d in [Vector2i(0, 1), Vector2i(0, -1), Vector2i(1, 0), Vector2i(-1, 0)]:
@@ -291,6 +308,27 @@ func _build_desk(c: Vector2i, ch: String, monitor_ids: Array, mon_i: int) -> voi
 	add_child(blocker)
 	blocker.position = wp + Vector3(0, 1.1, 0)
 
+	var rng := RandomNumberGenerator.new()
+	rng.seed = c.x * 131 + c.y * 7
+	var kb := _box(Vector3(0.36, 0.02, 0.14), wp + Vector3(0, 0.79, 0) + fv * 0.35, _mat("keyboard", Color()), self, false)
+	kb.rotation.y = rng.randf_range(-0.12, 0.12)
+	for i in rng.randi_range(0, 2):
+		var paper := _box(Vector3(0.21, 0.006, 0.30), wp + Vector3(rng.randf_range(-0.6, 0.6), 0.782 + i * 0.004, rng.randf_range(-0.5, 0.5)), _mat("paper", Color()), self, false)
+		paper.rotation.y = rng.randf_range(-0.7, 0.7)
+	if rng.randf() < 0.45:
+		var mug := Node3D.new()
+		add_child(mug)
+		mug.position = wp + Vector3(rng.randf_range(-0.7, 0.7), 0.83, rng.randf_range(-0.4, -0.7))
+		var mm := MeshInstance3D.new()
+		var mc := CylinderMesh.new()
+		mc.top_radius = 0.045
+		mc.bottom_radius = 0.04
+		mc.height = 0.1
+		mm.mesh = mc
+		mm.material_override = _mat("mug", Color())
+		mug.add_child(mm)
+	if ch != "d":
+		_build_chair(wp + fv * (CELL * 0.62), -fv, rng)
 	if ch == "U":
 		var spot := HideSpot.new()
 		add_child(spot)
@@ -468,6 +506,73 @@ func _build_lights() -> void:
 				_lights.append(l)
 				var panel := _box(Vector3(1.5, 0.06, 1.5), wp + Vector3(0, WALL_H - 0.05, 0), _mat("light_panel", Color()), self, false)
 				l.set_meta("panel", panel)
+
+func _build_chair(pos: Vector3, face: Vector3, rng: RandomNumberGenerator) -> void:
+	var chair := Node3D.new()
+	add_child(chair)
+	chair.position = pos + Vector3(rng.randf_range(-0.15, 0.15), 0, rng.randf_range(-0.15, 0.15))
+	chair.rotation.y = atan2(face.x, face.z) + PI + rng.randf_range(-0.5, 0.5)
+	var seat := _box(Vector3(0.46, 0.06, 0.44), Vector3(0, 0.48, 0), _mat("chair", Color()), chair, false)
+	_box(Vector3(0.44, 0.52, 0.07), Vector3(0, 0.80, 0.21), _mat("chair", Color()), chair, false)
+	var post := MeshInstance3D.new()
+	var pc := CylinderMesh.new()
+	pc.top_radius = 0.03
+	pc.bottom_radius = 0.03
+	pc.height = 0.40
+	post.mesh = pc
+	post.material_override = _mat("chrome", Color())
+	chair.add_child(post)
+	post.position = Vector3(0, 0.26, 0)
+	for a in 5:
+		var leg := _box(Vector3(0.05, 0.03, 0.30), Vector3(0, 0.05, 0.14), _mat("chrome", Color()), chair, false)
+		leg.rotation.y = a * TAU / 5.0
+	seat.rotation.x = rng.randf_range(-0.02, 0.02)
+
+func _build_plant(c: Vector2i) -> void:
+	var plant := Node3D.new()
+	add_child(plant)
+	plant.position = cell_to_world(c)
+	var pot := MeshInstance3D.new()
+	var pm := CylinderMesh.new()
+	pm.top_radius = 0.19
+	pm.bottom_radius = 0.14
+	pm.height = 0.34
+	pot.mesh = pm
+	pot.material_override = _mat("pot", Color())
+	plant.add_child(pot)
+	pot.position = Vector3(0, 0.17, 0)
+	for i in 3:
+		var ball := MeshInstance3D.new()
+		var bm := SphereMesh.new()
+		bm.radius = 0.30 - i * 0.07
+		bm.height = bm.radius * 1.7
+		ball.mesh = bm
+		ball.material_override = _mat("leaf", Color())
+		plant.add_child(ball)
+		ball.position = Vector3(0.05 - i * 0.05, 0.62 + i * 0.26, 0.03 * i)
+
+func _build_windows() -> void:
+	# night-city windows along the interior face of the perimeter walls
+	var win_mat: StandardMaterial3D = _mats["window"]
+	for x in range(1, W - 1, 3):
+		for side in [[Vector2i(x, 0), Vector2i(0, 1)], [Vector2i(x, H - 1), Vector2i(0, -1)]]:
+			var c: Vector2i = side[0]
+			var inward: Vector2i = side[1]
+			if at(c) == "#" and at(c + inward) not in ["#", "o"]:
+				_add_window(c, Vector3(inward.x, 0, inward.y))
+	for y in range(1, H - 1, 3):
+		for side in [[Vector2i(0, y), Vector2i(1, 0)], [Vector2i(W - 1, y), Vector2i(-1, 0)]]:
+			var c: Vector2i = side[0]
+			var inward: Vector2i = side[1]
+			if at(c) == "#" and at(c + inward) not in ["#", "o"]:
+				_add_window(c, Vector3(inward.x, 0, inward.y))
+
+func _add_window(c: Vector2i, inward: Vector3) -> void:
+	var wp := cell_to_world(c) + inward * (CELL * 0.5 + 0.02) + Vector3(0, 1.8, 0)
+	var frame := _box(Vector3(1.7, 1.5, 0.05), wp, _mat("frame", Color()), self, false)
+	frame.rotation.y = atan2(inward.x, inward.z)
+	var glass := _box(Vector3(1.55, 1.35, 0.05), wp + inward * 0.03, _mats["window"], self, false)
+	glass.rotation.y = frame.rotation.y
 
 # ---------- pathfinding grid ----------
 
@@ -705,6 +810,19 @@ func _apply_stage(st: Dictionary) -> void:
 		subtitle_requested.emit(cue, 4.5)
 	AudioSynth.play_ui("static", -10.0, 0.7)
 	_ambient_target = float(st.get("ambient", 1.0))
+	# the dream seeps into the materials themselves
+	var tint := create_tween()
+	if st_name == "anomaly":
+		tint.parallel().tween_property(_mats["wall"], "albedo_color", Color(0.58, 0.62, 0.55), 6.0)
+		tint.parallel().tween_property(_mats["floor"], "albedo_color", Color(0.38, 0.40, 0.44), 6.0)
+		tint.parallel().tween_property(_mats["partition"], "albedo_color", Color(0.55, 0.56, 0.66), 6.0)
+	elif st_name == "unravel":
+		tint.parallel().tween_property(_mats["wall"], "albedo_color", Color(0.50, 0.42, 0.60), 8.0)
+		tint.parallel().tween_property(_mats["floor"], "albedo_color", Color(0.30, 0.28, 0.40), 8.0)
+		tint.parallel().tween_property(_mats["ceil"], "albedo_color", Color(0.30, 0.30, 0.38), 8.0)
+		tint.parallel().tween_property(_mats["desk"], "albedo_color", Color(0.55, 0.40, 0.42), 8.0)
+		if player != null and player.camera != null:
+			tint.parallel().tween_property(player.camera, "fov", 75.0, 8.0)
 	_env.fog_enabled = float(st.get("fog", 0.0)) > 0.0
 	_env.fog_density = float(st.get("fog", 0.0))
 	_flicker_level = int(st.get("flicker", 0))
