@@ -101,6 +101,20 @@ func _mat(name: String, color: Color, rough := 0.9, emis := Color(0, 0, 0), emis
 
 ## Textured material: world-space triplanar mapping so greedy-merged boxes
 ## of any size tile seamlessly; albedo_color tints the mid-grey texture.
+## Adds a 512px high-frequency detail layer to a textured material.
+## MUL blending halves brightness (detail mean is 0.5), so the albedo
+## tint is doubled to compensate.
+func _add_detail(m: StandardMaterial3D, tex: ImageTexture, uv2_scale: Vector3, strength_note := true) -> void:
+	m.detail_enabled = true
+	m.detail_blend_mode = BaseMaterial3D.BLEND_MODE_MUL
+	m.detail_albedo = tex
+	m.detail_uv_layer = BaseMaterial3D.DETAIL_UV_2
+	m.uv2_triplanar = true
+	m.uv2_world_triplanar = true
+	m.uv2_scale = uv2_scale
+	if strength_note:
+		m.albedo_color = m.albedo_color * 2.0
+
 func _mat_tex(name: String, color: Color, tex: Dictionary, uv_scale: Vector3, rough := 0.9, normal_scale := 1.0) -> StandardMaterial3D:
 	if _mats.has(name):
 		return _mats[name]
@@ -132,6 +146,10 @@ func _make_materials() -> void:
 	_mat_tex("floor", Color(1, 1, 1), carpet_t, Vector3(0.5, 0.5, 0.5), 0.95, 1.4)
 	_mat_tex("ceil", Color(1, 1, 1), ceil_t, Vector3(0.5, 0.5, 0.5), 0.95, 1.0)
 	_mat_tex("wall", Color(1, 1, 1), wall_t, Vector3(0.45, 1.0 / WALL_H, 0.45), 0.85, 1.2)
+	# fiber-level detail layers: carpet loop pile, mineral-fiber ceiling, plaster grain
+	_add_detail(_mats["floor"], TexFactory.detail_noise(301, 0.85), Vector3(3.0, 3.0, 3.0))
+	_add_detail(_mats["ceil"], TexFactory.detail_noise(303, 0.5, true), Vector3(2.2, 2.2, 2.2))
+	_add_detail(_mats["wall"], TexFactory.detail_noise(307, 0.7), Vector3(2.6, 2.6, 2.6))
 	_mat_tex("wall_glitch", Color(1.0, 0.62, 1.05), wall_t, Vector3(0.45, 1.0 / WALL_H, 0.45), 0.85, 1.2)
 	_mat_tex("partition", Color(1, 1, 1), fabric_t, Vector3(1.2, 1.2, 1.2), 0.95, 1.2)
 	var photo_wood := TexFactory.photo_wood()

@@ -250,3 +250,17 @@ static func photo_wood() -> Dictionary:
 			bi.generate_mipmaps()
 			normal = ImageTexture.create_from_image(bi)
 	return {"a": albedo, "n": normal, "r": rough}
+
+## High-frequency grayscale detail layer (C++-generated, no per-pixel GDScript).
+## Meant for StandardMaterial3D detail_albedo with MUL blending; mean ~0.5,
+## so the material's albedo_color must be doubled to compensate.
+static func detail_noise(seed_v: int, freq: float, cellular := false) -> ImageTexture:
+	var n := FastNoiseLite.new()
+	n.seed = seed_v
+	n.noise_type = FastNoiseLite.TYPE_CELLULAR if cellular else FastNoiseLite.TYPE_VALUE
+	n.frequency = freq
+	n.fractal_octaves = 2
+	var img := n.get_image(512, 512, false, false, false)
+	img.convert(Image.FORMAT_RGB8)
+	img.generate_mipmaps()
+	return ImageTexture.create_from_image(img)
