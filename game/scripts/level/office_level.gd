@@ -98,30 +98,56 @@ func _mat(name: String, color: Color, rough := 0.9, emis := Color(0, 0, 0), emis
 	_mats[name] = m
 	return m
 
+## Textured material: world-space triplanar mapping so greedy-merged boxes
+## of any size tile seamlessly; albedo_color tints the mid-grey texture.
+func _mat_tex(name: String, color: Color, tex: Texture2D, uv_scale: Vector3, rough := 0.9) -> StandardMaterial3D:
+	if _mats.has(name):
+		return _mats[name]
+	var m := StandardMaterial3D.new()
+	m.albedo_color = color
+	m.albedo_texture = tex
+	m.uv1_triplanar = true
+	m.uv1_world_triplanar = true
+	m.uv1_scale = uv_scale
+	m.roughness = rough
+	m.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
+	_mats[name] = m
+	return m
+
 func _make_materials() -> void:
-	_mat("floor", Color(0.21, 0.22, 0.26))
-	_mat("ceil", Color(0.10, 0.11, 0.13))
-	_mat("wall", Color(0.36, 0.38, 0.45))
-	_mat("wall_glitch", Color(0.36, 0.22, 0.38))
-	_mat("partition", Color(0.34, 0.38, 0.47))
-	_mat("desk", Color(0.36, 0.30, 0.24))
-	_mat("monitor", Color(0.09, 0.10, 0.12))
-	_mat("cabinet", Color(0.30, 0.34, 0.30))
-	_mat("cabinet_worn", Color(0.42, 0.36, 0.26))
-	_mat("table", Color(0.42, 0.38, 0.33))
-	_mat("elev", Color(0.45, 0.48, 0.54), 0.4)
-	_mat("printer", Color(0.55, 0.56, 0.58))
-	_mat("cup", Color(0.85, 0.80, 0.72))
-	_mat("stapler", Color(0.65, 0.25, 0.2))
+	var carpet_t := TexFactory.carpet()
+	var wall_t := TexFactory.wall(WALL_H)
+	var ceil_t := TexFactory.ceiling()
+	var wood_t := TexFactory.wood()
+	var fabric_t := TexFactory.fabric()
+	var metal_t := TexFactory.metal()
+	# 1 texture repeat per 2 m on floors/ceilings; walls pin image row 0 to y=0
+	_mat_tex("floor", Color(0.42, 0.45, 0.54), carpet_t, Vector3(0.5, 0.5, 0.5))
+	_mat_tex("ceil", Color(0.42, 0.43, 0.46), ceil_t, Vector3(0.5, 0.5, 0.5))
+	_mat_tex("wall", Color(0.62, 0.63, 0.68), wall_t, Vector3(0.45, 1.0 / WALL_H, 0.45), 0.85)
+	_mat_tex("wall_glitch", Color(0.62, 0.40, 0.66), wall_t, Vector3(0.45, 1.0 / WALL_H, 0.45), 0.85)
+	_mat_tex("partition", Color(0.58, 0.64, 0.82), fabric_t, Vector3(1.2, 1.2, 1.2), 0.95)
+	_mat_tex("desk", Color(0.70, 0.54, 0.38), wood_t, Vector3(0.55, 3.5, 0.55), 0.7)
+	_mat("monitor", Color(0.09, 0.10, 0.12), 0.6)
+	_mat_tex("cabinet", Color(0.55, 0.62, 0.55), metal_t, Vector3(1.6, 0.5, 1.6), 0.6)
+	_mat_tex("cabinet_worn", Color(0.80, 0.68, 0.48), metal_t, Vector3(1.6, 0.5, 1.6), 0.75)
+	_mat_tex("table", Color(0.52, 0.42, 0.32), wood_t, Vector3(0.55, 3.5, 0.55), 0.7)
+	_mat_tex("elev", Color(0.82, 0.86, 0.94), metal_t, Vector3(1.2, 0.35, 1.2), 0.35)
+	_mat("printer", Color(0.55, 0.56, 0.58), 0.7)
+	_mat("cup", Color(0.85, 0.80, 0.72), 0.55)
+	_mat("stapler", Color(0.65, 0.25, 0.2), 0.6)
 	_mat("scuff", Color(0.08, 0.07, 0.06))
+	_mat("light_panel", Color(0.9, 0.92, 0.95), 0.9, Color(0.95, 0.96, 1.0), 2.6)
 
 func _build_environment() -> void:
 	_env = Environment.new()
 	_env.background_mode = Environment.BG_COLOR
 	_env.background_color = Color(0.04, 0.05, 0.07)
 	_env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-	_env.ambient_light_color = Color(0.52, 0.57, 0.68)
-	_env.ambient_light_energy = 1.55
+	_env.ambient_light_color = Color(0.50, 0.55, 0.68)
+	_env.ambient_light_energy = 1.35
+	_env.tonemap_mode = Environment.TONE_MAPPER_FILMIC
+	_env.tonemap_exposure = 1.15
 	_env.fog_light_color = Color(0.35, 0.30, 0.45)
 	var we := WorldEnvironment.new()
 	we.environment = _env
@@ -435,10 +461,13 @@ func _build_lights() -> void:
 				var l := OmniLight3D.new()
 				l.omni_range = 10.0
 				l.light_energy = 1.35
-				l.light_color = Color(0.82, 0.86, 0.95)
+				l.light_color = Color(0.87, 0.90, 0.98)
 				add_child(l)
-				l.position = cell_to_world(Vector2i(x, y)) + Vector3(0, 2.7, 0)
+				var wp := cell_to_world(Vector2i(x, y))
+				l.position = wp + Vector3(0, 2.7, 0)
 				_lights.append(l)
+				var panel := _box(Vector3(1.5, 0.06, 1.5), wp + Vector3(0, WALL_H - 0.05, 0), _mat("light_panel", Color()), self, false)
+				l.set_meta("panel", panel)
 
 # ---------- pathfinding grid ----------
 
@@ -655,6 +684,10 @@ func _process(delta: float) -> void:
 			for l: OmniLight3D in _lights:
 				if randf() < 0.25 * _flicker_level:
 					l.light_energy = randf_range(0.25, 1.15)
+					var panel: Node3D = l.get_meta("panel", null)
+					if panel != null:
+						var mi: MeshInstance3D = panel.get_child(0)
+						mi.transparency = clampf(1.1 - l.light_energy, 0.0, 0.75)
 	_env.ambient_light_energy = lerpf(_env.ambient_light_energy, _ambient_target, delta * 1.5)
 	# safety: player fell out of the world
 	if player != null and player.global_position.y < -6.0:
