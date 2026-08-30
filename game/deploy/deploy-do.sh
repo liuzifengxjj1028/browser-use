@@ -37,7 +37,7 @@ server {
     gzip_min_length 1024;
 
     location / {
-        try_files \$uri =404;
+        try_files \$uri \$uri/ =404;
     }
     location ~ \.wasm\$ {
         types { application/wasm wasm; }
